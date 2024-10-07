@@ -11,8 +11,8 @@ def run_command(cmd):
 
 
 if __name__ == "__main__":
-    # run_command("paru -Syu")
-    # run_command("flatpak update")
+    run_command("paru -Syu")
+    run_command("flatpak update")
     run_command("nvim --headless '+Lazy! sync' +qa")
 
     print("\n" + f"{BLUE}:: すべてのアップデートが完了しました{NC}")
