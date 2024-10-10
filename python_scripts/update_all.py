@@ -29,9 +29,15 @@ if __name__ == "__main__":
         run_command("sudo pacman -Syu")
 
     sleep(1)
-    run_command("flatpak update")
+
+    if is_command_exists("flatpak"):
+        run_command("flatpak update")
+
     sleep(1)
-    run_command("nvim --headless '+Lazy! sync' +qa")
+
+    if is_command_exists("nvim"):
+        run_command("nvim --headless '+Lazy! sync' +qa")
+
     sleep(1)
 
     print("\n" + f"{BLUE}:: すべてのアップデートが完了しました{NC}")
