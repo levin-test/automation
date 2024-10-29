@@ -15,8 +15,9 @@ def is_command_exists(command: str):
         return False
 
 
-def run_command(cmd):
+def run_command(cmd, sec=0):
     print(f"{BLUE}:: {cmd}によるアップデートを実行中...{NC}")
+    sleep(sec)
     subprocess.run(cmd, shell=True)
 
 
@@ -28,16 +29,10 @@ if __name__ == "__main__":
     else:
         run_command("sudo pacman -Syu")
 
-    sleep(1)
-
     if is_command_exists("flatpak"):
-        run_command("flatpak update")
-
-    sleep(1)
+        run_command("flatpak update", 3)
 
     if is_command_exists("nvim"):
-        run_command("nvim --headless '+Lazy! sync' +qa")
-
-    sleep(1)
+        run_command("nvim --headless '+Lazy! sync' +qa", 3)
 
     print("\n" + f"{BLUE}:: すべてのアップデートが完了しました{NC}")
