@@ -2,35 +2,56 @@
 
 pacman_list=(
   # must have
+  eza
+  fcitx5-mozc
   firefox
   fish
   flatpak
   hyprland
   neovim
-  vim
   starship
+  vim
+  xdg-user-dirs
+  xdg-utils
+  zoxide
   # hyprland
   waybar
   # dev tools
   docker
+  git
+  git-delta
   github-cli
   glab
   lazygit
-  # utility
+  # utilities
+  cava
+  fastfetch
   htop
   nvtop
   fastfetch
   # gaming and videos
+  kdenlive
   obs-studio
   steam
 )
 
 aur_list=(
+  # browsers
   google-chrome
+  zen-browser
 )
 
 flatpak_list=(
-  test
+  # GPU monitor
+  io.missioncenter.MissionCenter
+  # graphics
+  org.upscayl.Upscayl
+  # gaming
+  net.davidotek.pupgui2
+  # converter
+  fr.handbrake.ghb
+  # utilities
+  com.usebottles.bottles
 )
 
 echo "--pacman--"
