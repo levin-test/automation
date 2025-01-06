@@ -28,11 +28,14 @@ pacman_list=(
   fastfetch
   htop
   nvtop
-  fastfetch
   # gaming and videos
   kdenlive
   obs-studio
   steam
+)
+
+cachyos_pkg=(
+  proton-cachyos
 )
 
 aur_list=(
@@ -42,16 +45,22 @@ aur_list=(
 )
 
 flatpak_list=(
+  # mail client
+  org.mozilla.Thunderbird
   # GPU monitor
   io.missioncenter.MissionCenter
   # graphics
   org.upscayl.Upscayl
+  # recorder
+  com.dec05eba.gpu_screen_recorder
   # gaming
   net.davidotek.pupgui2
   # converter
   fr.handbrake.ghb
-  # utilities
+  # wine managers
   com.usebottles.bottles
+  # backup tools
+  org.gnome.DejaDup
 )
 
 echo "--pacman--"

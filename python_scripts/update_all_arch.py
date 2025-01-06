@@ -30,7 +30,7 @@ if __name__ == "__main__":
     if is_command_exists("yay"):
         run_command("yay -Syu", 0, BLUE, NC)
     elif is_command_exists("paru"):
-        run_command("paru -Syu", 0.3, BLUE, NC)
+        run_command("paru -Syu", 0, BLUE, NC)
     else:
         run_command("sudo pacman -Syu", 0.3, BLUE, NC)
 
