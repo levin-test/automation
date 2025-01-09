@@ -46,19 +46,39 @@ aur_list=(
 
 flatpak_list=(
   # mail client
+  # Thunderbird
   org.mozilla.Thunderbird
+
   # GPU monitor
+  # Misson Center
   io.missioncenter.MissionCenter
+
   # graphics
+  # Upscayl
   org.upscayl.Upscayl
+
+  # Video Editing
+  # Video Trimmer
+  org.gnome.gitlab.YaLTeR.VideoTrimmer
+
   # recorder
+  # GPU Screen Recorder
   com.dec05eba.gpu_screen_recorder
+
   # gaming
+  # ProtonUp-Qt
   net.davidotek.pupgui2
+
   # converter
+  # HandBrake
   fr.handbrake.ghb
+
   # wine managers
+  # Bottles
   com.usebottles.bottles
+  # LocalSend
+  org.localsend.localsend_app
+
   # backup tools
   org.gnome.DejaDup
 )
