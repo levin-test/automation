@@ -1,5 +1,6 @@
 import subprocess
 import time
+import shlex
 
 BLUE = "\033[1;34m"
 NC = "\033[0;0m"
@@ -23,7 +24,7 @@ def run_command(cmd, sec=0.5, COLOR="\033[1;34m", NC="\033[0;0m"):
 
     print(f"{COLOR}:: {cmd}によるアップデートを実行中{NC}", end="")
     show_progress(".....")
-    subprocess.run(cmd, shell=True)
+    subprocess.run(shlex.split(cmd))
 
 
 if __name__ == "__main__":
