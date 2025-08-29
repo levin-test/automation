@@ -5,93 +5,93 @@
 # 今後、実際のインストール処理を追加予定
 
 pacman_list=(
-	# must have
-	chezmoi
-	eza
-	fcitx5-mozc
-	fd
-	firefox
-	fish
-	flatpak
-	fzf
-	hyprland
-	neovim
-	rclone
-	starship
-	vim
+  # must have
+  chezmoi
+  eza
+  fcitx5-mozc
+  fd
+  firefox
+  fish
+  flatpak
+  fzf
+  hyprland
+  neovim
+  rclone
+  starship
+  vim
   vivaldi
-	xdg-user-dirs
-	xdg-utils
-	zoxide
-	zed
-	# hyprland
-	waybar
-	# dev tools
-	docker
-	git
-	git-delta
-	github-cli
-	glab
-	lazygit
-	# utilities
-	cava
-	fastfetch
-	ffmpeg
-	htop
-	nvtop
-	# gaming and videos
-	kdenlive
-	obs-studio
-	steam
+  xdg-user-dirs
+  xdg-utils
+  zoxide
+  zed
+  # hyprland
+  waybar
+  # dev tools
+  docker
+  git
+  git-delta
+  github-cli
+  glab
+  lazygit
+  # utilities
+  cava
+  fastfetch
+  ffmpeg
+  htop
+  nvtop
+  # gaming and videos
+  kdenlive
+  obs-studio
+  steam
 )
 
 cachyos_pkg=(
-	proton-cachyos
+  proton-cachyos
 )
 
 aur_list=(
-	# browsers
-	google-chrome
-	visual-studio-code-bin
+  # browsers
+  google-chrome
+  visual-studio-code-bin
 )
 
 flatpak_list=(
-	# mail client
-	# Thunderbird
-	org.mozilla.Thunderbird
+  # mail client
+  # Thunderbird
+  org.mozilla.Thunderbird
 
-	# GPU monitor
-	# Misson Center
-	io.missioncenter.MissionCenter
+  # GPU monitor
+  # Misson Center
+  io.missioncenter.MissionCenter
 
-	# graphics
-	# Upscayl
-	org.upscayl.Upscayl
+  # graphics
+  # Upscayl
+  org.upscayl.Upscayl
 
-	# Video Editing
-	# Video Trimmer
-	org.gnome.gitlab.YaLTeR.VideoTrimmer
+  # Video Editing
+  # Video Trimmer
+  org.gnome.gitlab.YaLTeR.VideoTrimmer
 
-	# recorder
-	# GPU Screen Recorder
-	com.dec05eba.gpu_screen_recorder
+  # recorder
+  # GPU Screen Recorder
+  com.dec05eba.gpu_screen_recorder
 
-	# gaming
-	# ProtonUp-Qt
-	net.davidotek.pupgui2
+  # gaming
+  # ProtonUp-Qt
+  net.davidotek.pupgui2
 
-	# converter
-	# HandBrake
-	fr.handbrake.ghb
+  # converter
+  # HandBrake
+  fr.handbrake.ghb
 
-	# wine managers
-	# Bottles
-	com.usebottles.bottles
-	# LocalSend
-	org.localsend.localsend_app
+  # wine managers
+  # Bottles
+  com.usebottles.bottles
+  # LocalSend
+  org.localsend.localsend_app
 
-	# backup tools
-	org.gnome.World.PikaBackup
+  # backup tools
+  org.gnome.World.PikaBackup
 )
 
 # テスト実行用フラグ（trueなら表示のみ、falseならインストール処理も実行）
@@ -106,19 +106,19 @@ printf "%s\n" "${flatpak_list[@]}"
 
 # 実際のインストール処理（TEST_MODE=falseのときのみ実行）
 if [ "$TEST_MODE" = false ]; then
-	# pacman
-	sudo pacman -S --needed ${pacman_list[@]}
+  # pacman
+  sudo pacman -S --needed ${pacman_list[@]}
 
-	# cachyos
-	sudo pacman -S --needed ${cachyos_pkg[@]}
+  # cachyos
+  sudo pacman -S --needed ${cachyos_pkg[@]}
 
-	# aur (yayが必要)
-	yay -S --needed ${aur_list[@]}
+  # aur (yayが必要)
+  yay -S --needed ${aur_list[@]}
 
-	# flatpak
-	for pkg in "${flatpak_list[@]}"; do
-		flatpak install -y "$pkg"
-	done
+  # flatpak
+  for pkg in "${flatpak_list[@]}"; do
+    flatpak install -y "$pkg"
+  done
 fi
 
 cd "$HOME"
