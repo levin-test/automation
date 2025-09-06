@@ -39,6 +39,7 @@ pacman_list=(
   ffmpeg
   htop
   nvtop
+  scrcpy
   # gaming and videos
   kdenlive
   obs-studio
@@ -103,6 +104,11 @@ echo "--aur--"
 printf "%s\n" "${aur_list[@]}"
 echo "--flatpak--"
 printf "%s\n" "${flatpak_list[@]}"
+
+# ~/.local/bin ディレクトリ作成（TEST_MODE=falseのときのみ実行）
+if [ "$TEST_MODE" = false ]; then
+  mkdir -p "$HOME/.local/bin"
+fi
 
 # 実際のインストール処理（TEST_MODE=falseのときのみ実行）
 if [ "$TEST_MODE" = false ]; then
