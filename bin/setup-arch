@@ -14,24 +14,23 @@ pacman_list=(
   fish
   flatpak
   fzf
-  hyprland
+  go-yq
   neovim
   rclone
+  ripgrep
   starship
-  vim
   vivaldi
   xdg-user-dirs
   xdg-utils
   zoxide
   zed
-  # hyprland
-  waybar
   # dev tools
   docker
   git
   git-delta
   github-cli
   glab
+  go
   lazygit
   # utilities
   cava
@@ -46,17 +45,23 @@ pacman_list=(
   steam
 )
 
-cachyos_pkg=(
+cachyos_pkgs=(
   proton-cachyos
 )
 
-aur_list=(
+hyprland_pkgs=(
+  hyprland
+  waybar
+)
+
+aur_pkgs=(
   # browsers
   google-chrome
   visual-studio-code-bin
+  nkf
 )
 
-flatpak_list=(
+flatpak_pkgs=(
   # mail client
   # Thunderbird
   org.mozilla.Thunderbird
@@ -101,9 +106,9 @@ TEST_MODE=true
 echo "--pacman--"
 printf "%s\n" "${pacman_list[@]}"
 echo "--aur--"
-printf "%s\n" "${aur_list[@]}"
+printf "%s\n" "${aur_pkgs[@]}"
 echo "--flatpak--"
-printf "%s\n" "${flatpak_list[@]}"
+printf "%s\n" "${flatpak_pkgs[@]}"
 
 # ~/.local/bin ディレクトリ作成（TEST_MODE=falseのときのみ実行）
 if [ "$TEST_MODE" = false ]; then
@@ -116,13 +121,13 @@ if [ "$TEST_MODE" = false ]; then
   sudo pacman -S --needed ${pacman_list[@]}
 
   # cachyos
-  sudo pacman -S --needed ${cachyos_pkg[@]}
+  sudo pacman -S --needed ${cachyos_pkgs[@]}
 
   # aur (yayが必要)
-  yay -S --needed ${aur_list[@]}
+  yay -S --needed ${aur_pkgs[@]}
 
   # flatpak
-  for pkg in "${flatpak_list[@]}"; do
+  for pkg in "${flatpak_pkgs[@]}"; do
     flatpak install -y "$pkg"
   done
 fi

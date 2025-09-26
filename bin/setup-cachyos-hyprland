@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+
+# CachyOS + Hyprland セットアップスクリプト
+
+# 必要なパッケージリスト
+pacman_pkgs=(
+  # --- Webブラウザ ---
+  firefox                  # Webブラウザ
+  vivaldi                  # Webブラウザ
+
+  # --- 日本語入力 ---
+  fcitx5-mozc              # 日本語入力システム（Mozcエンジン）
+  fcitx5-configtool        # fcitx5用設定ツール
+
+  # --- シェル・ターミナル ---
+  fish                     # 使いやすいシェル
+  starship                 # 高機能シェルプロンプト
+
+  # --- ファイル操作 ---
+  eza                      # 高機能lsコマンド（ファイル一覧表示）
+  fd                       # 高速ファイル検索コマンド
+  rclone                   # クラウドストレージ同期ツール
+  ripgrep                  # 高速grep互換検索ツール
+  zoxide                   # 高速ディレクトリ移動ツール
+
+  # --- エディタ ---
+  neovim                   # 高機能テキストエディタ
+  zed                      # 高速テキストエディタ
+
+  # --- フォント ---
+  ttf-jetbrains-mono-nerd  # JetBrains Mono Nerd Font（プログラミング向けフォント）
+
+  # --- XDG関連 ---
+  xdg-desktop-portal-gtk   # GTK用XDGデスクトップポータル（Flatpak等の連携）
+  xdg-user-dirs            # ユーザー用ディレクトリ管理
+  xdg-utils                # XDG標準ユーティリティ
+
+  # --- dotfiles管理 ---
+  stow                     # ドットファイル管理ツール
+
+  # --- その他ユーティリティ ---
+  flatpak                  # サンドボックス型アプリ配布システム
+  fzf                      # インタラクティブなファジーファインダー
+  go-yq                    # YAML/JSON変換・抽出ツール（Go実装）
+
+  # --- 開発ツール ---
+  docker                   # コンテナ仮想化
+  git                      # バージョン管理
+  git-delta                # git diffの見やすい表示
+  github-cli               # GitHub操作用CLI
+  go                       # Go言語本体
+  lazygit                  # ターミナル用Git操作ツール
+
+  # --- ユーティリティ ---
+  fastfetch                # システム情報表示
+  ffmpeg                   # 動画・音声変換/編集
+  nvtop                    # NVIDIA GPUモニタ
+
+  # --- 動画・ゲーム ---
+  obs-studio               # 画面録画・配信
+  steam                    # ゲームプラットフォーム
+
+  # --- Wayland/Hyprland向け ---
+  grim                     # 画面キャプチャ（Wayland用）
+  make                     # 通知デーモン（Wayland用）
+  libnotify                # 通知送信用CLIツール
+  network-manager-applet   # ネットワーク管理GUI
+  slurp                    # 範囲選択ツール（Wayland用）
+  swaybg                   # 壁紙設定（Wayland用）
+  swaylock                 # 画面ロック（Wayland用）
+  wl-clipboard             # クリップボード操作（Wayland用）
+  wofi                     # アプリケーションランチャー（Wayland用）
+)
+
+# オプションパッケージ
+optional_pacman_list=(
+  cava
+  glab
+  htop
+  neovide
+  scrcpy
+  kdenlive
+)
+
+optional_aur_pkgs=(
+  google-chrome
+)
+
+# CachyOS独自パッケージ
+cachyos_pkgs=(
+  proton-cachyos
+)
+
+# Hyprland関連パッケージ
+hyprland_pkgs=(
+  hyprland
+  waybar
+  hyprpaper
+  hyprlock
+  hypridle
+  xdg-desktop-portal-hyprland
+)
+
+# AURパッケージ
+aur_pkgs=(
+  nkf
+  visual-studio-code-bin
+)
+
+# フラグでflatpakパッケージを有効化
+# flatpak_pkgsはデフォルトでインストールしない（フラグで有効化）
+flatpak_pkgs=(
+  org.mozilla.Thunderbird
+  io.missioncenter.MissionCenter
+  org.upscayl.Upscayl
+  org.gnome.gitlab.YaLTeR.VideoTrimmer
+  com.dec05eba.gpu_screen_recorder
+  net.davidotek.pupgui2
+  fr.handbrake.ghb
+  com.usebottles.bottles
+  org.localsend.localsend_app
+  org.gnome.World.PikaBackup
+)
+
+# テストモードフラグ（trueでインストールせずにパッケージリストのみ表示）
+TEST_MODE=true
+
+# オプションフラグ解析
+WITH_OPTIONAL=false
+WITH_FLATPAK=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --with-optional)
+      WITH_OPTIONAL=true
+      ;;
+    --with-flatpak)
+      WITH_FLATPAK=true
+      ;;
+  esac
+done
+
+# パッケージリストにオプションを追加
+if [ "$WITH_OPTIONAL" = true ]; then
+  pacman_pkgs+=("${optional_pacman_list[@]}")
+  aur_pkgs+=("${optional_aur_pkgs[@]}")
+fi
+
+echo "--pacman--"
+printf "%s\n" "${pacman_pkgs[@]}"
+echo "--cachyos--"
+printf "%s\n" "${cachyos_pkgs[@]}"
+echo "--hyprland--"
+printf "%s\n" "${hyprland_pkgs[@]}"
+echo "--aur--"
+printf "%s\n" "${aur_pkgs[@]}"
+if [ "$WITH_FLATPAK" = true ]; then
+  echo "--flatpak--"
+  printf "%s\n" "${flatpak_pkgs[@]}"
+fi
+
+if [ "$TEST_MODE" = false ]; then
+  mkdir -p "$HOME/.local/bin"
+  # yayインストール（未導入なら）
+  if ! command -v yay >/dev/null 2>&1; then
+    sudo pacman -S --needed base-devel git
+    git clone https://aur.archlinux.org/yay.git /tmp/yay
+    (cd /tmp/yay && makepkg -si --noconfirm)
+  fi
+  # パッケージインストール
+  sudo pacman -S --needed ${pacman_pkgs[@]}
+  sudo pacman -S --needed ${cachyos_pkgs[@]}
+  sudo pacman -S --needed ${hyprland_pkgs[@]}
+  yay -S --needed ${aur_pkgs[@]}
+  if [ "$WITH_FLATPAK" = true ]; then
+    for pkg in "${flatpak_pkgs[@]}"; do
+      flatpak install -y "$pkg"
+    done
+  fi
+fi
+
+# Docker用ディレクトリ
+mkdir -p ~/docker-data/{downloads/{raw,processed,archive},scripts/{active,development,templates}}
