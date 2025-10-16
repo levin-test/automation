@@ -1,0 +1,312 @@
+#!/bin/bash
+# zf-launcher2.sh
+# A robust file launcher using fd, fzf, bat, and yq.
+# This script is designed to be configured via a YAML file.
+
+set -euo pipefail
+
+# --- Dependency and Configuration Check ---
+
+# 1. Check for required commands
+check_dependencies() {
+  local missing_deps=0
+  local deps=($@)
+  for cmd in "${deps[@]}"; do
+    if ! command -v "$cmd" &>/dev/null; then
+      echo "❌ Error: Required command '$cmd' is not installed." >&2
+      missing_deps=1
+    elif [ "$cmd" = "yq" ]; then
+      # Check if yq is go-yq (mikefarah/yq)
+      if ! yq --version 2>/dev/null | grep -q "mikefarah"; then
+        echo "❌ Error: yq is not the required go-yq (mikefarah/yq). Please install go-yq." >&2
+        missing_deps=1
+      fi
+    fi
+  done
+  if [ "$missing_deps" -eq 1 ]; then
+    echo "Please install the missing dependencies and try again." >&2
+    exit 1
+  fi
+}
+
+# Define all dependencies here
+REQUIRED_COMMANDS=("yq" "fzf" "fd" "bat")
+check_dependencies "${REQUIRED_COMMANDS[@]}"
+
+# 2. Locate and load configuration
+CONFIG_FILE="$HOME/.config/zf-launcher/config.yaml"
+
+# Create a default config if it doesn't exist
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "🔍 Configuration file not found. Creating a default one at $CONFIG_FILE"
+  mkdir -p "$(dirname "$CONFIG_FILE")"
+  # Using the config from the user's context
+  cat >"$CONFIG_FILE" <<'EOF'
+# ~/.config/zf-launcher/config.yaml
+terminal:
+  name: kitty
+  # Available: kitty, alacritty, wezterm, foot
+
+search:
+  base_path: ~
+  exclude:
+    - .cache
+    - node_modules
+    - .git
+    - target
+    - build
+    - dist
+    - .next
+    - __pycache__
+    - .venv
+  include_hidden: true
+  file_types:
+    - f # files
+    - d # directories
+
+fzf:
+  preview:
+    enabled: true
+    position: right
+    size: 50%
+    window_options: "border-rounded"
+  layout:
+    height: 80%
+    border: rounded
+    margin: 1
+    padding: 1
+  keybindings:
+    toggle_preview: "ctrl-p"
+    select_all: "ctrl-a"
+    deselect_all: "ctrl-d"
+
+editor:
+  command: zeditor
+  flags:
+    - --new
+  fallback: nvim
+
+ui:
+  show_progress: true
+  show_terminal_info: true
+  icons:
+    directory: "📁"
+    file: "📄"
+    success: "✅"
+    error: "❌"
+    loading: "🔍"
+
+logging:
+  enabled: true
+  level: info
+  file: /tmp/zf-launcher.log
+EOF
+  echo "✅ Default configuration created."
+fi
+
+# --- Parse Configuration using yq ---
+
+# Function to safely parse YAML values
+yq_get() {
+  yq e "$1" "$CONFIG_FILE"
+}
+
+# Terminal
+TERMINAL=$(yq_get '.terminal.name')
+
+# Search parameters
+SEARCH_PATH=$(yq_get '.search.base_path' | sed "s|~|$HOME|") # Expand ~
+INCLUDE_HIDDEN=$(yq_get '.search.include_hidden')
+mapfile -t EXCLUDE_PATHS < <(yq_get '.search.exclude[]')
+mapfile -t FILE_TYPES < <(yq_get '.search.file_types[]')
+
+# FZF parameters
+PREVIEW_ENABLED=$(yq_get '.fzf.preview.enabled')
+PREVIEW_POSITION=$(yq_get '.fzf.preview.position')
+PREVIEW_SIZE=$(yq_get '.fzf.preview.size')
+PREVIEW_WINDOW_OPTS=$(yq_get '.fzf.preview.window_options')
+FZF_HEIGHT=$(yq_get '.fzf.layout.height')
+FZF_BORDER=$(yq_get '.fzf.layout.border')
+FZF_MARGIN=$(yq_get '.fzf.layout.margin')
+FZF_PADDING=$(yq_get '.fzf.layout.padding')
+mapfile -t FZF_KEYBINDINGS < <(yq e '[.fzf.keybindings | to_entries[] | .value + ":" + .key] | .[]' "$CONFIG_FILE")
+
+# Editor parameters
+EDITOR_CMD=$(yq_get '.editor.command')
+EDITOR_FALLBACK=$(yq_get '.editor.fallback')
+mapfile -t EDITOR_FLAGS < <(yq_get '.editor.flags[]')
+
+# UI Icons
+ICON_DIR=$(yq_get '.ui.icons.directory')
+ICON_FILE=$(yq_get '.ui.icons.file')
+ICON_LOADING=$(yq_get '.ui.icons.loading')
+
+# --- Build Commands Dynamically ---
+
+# 1. Build `fd` command arguments
+declare -a FD_ARGS
+if [[ "$INCLUDE_HIDDEN" == "true" ]]; then
+  FD_ARGS+=("--hidden")
+fi
+for path in "${EXCLUDE_PATHS[@]}"; do
+  FD_ARGS+=("--exclude" "$path")
+done
+for ftype in "${FILE_TYPES[@]}"; do
+  FD_ARGS+=("--type" "$ftype")
+done
+
+# 2. Build `fzf` preview command
+# This function will be exported to be available inside fzf's preview shell
+# This avoids creating a temporary script file.
+generate_preview() {
+    local path="$1"
+    if [ -d "$path" ]; then
+        echo "${ICON_DIR} Directory: $path
+"
+        echo "────────────────────────────────────────
+"
+        echo "📊 Contents:
+"
+        ls -lah "$path" 2>/dev/null | head -15
+        echo "
+"
+        echo "🗂️  Subdirectories:
+"
+        find "$path" -maxdepth 1 -type d 2>/dev/null | tail -n +2 | head -5
+        echo "
+"
+        echo "📄 Files:
+"
+        find "$path" -maxdepth 1 -type f 2>/dev/null | head -5
+    else
+        echo "${ICON_FILE} File: $path
+"
+        local file_type
+        file_type=$(file --mime-type "$path" 2>/dev/null | cut -d: -f2 | xargs)
+        echo "🏷️  Type: $file_type
+"
+        echo "📏 Size: $(du -h "$path" 2>/dev/null | cut -f1)
+"
+        echo "📅 Modified: $(stat -c %y "$path" 2>/dev/null | cut -d. -f1)
+"
+        echo "────────────────────────────────────────
+"
+        
+bat --color=always \
+            --style=header,grid,numbers \
+            --line-range=:100 \
+            --theme=ansi \
+            "$path" 2>/dev/null || head -50 "$path" 2>/dev/null
+    fi
+}
+
+# Export the function and necessary variables so fzf's subshell can see them
+export -f generate_preview
+export ICON_DIR ICON_FILE
+
+# 3. Build `fzf` command arguments
+declare -a FZF_ARGS
+FZF_ARGS+=(
+  "--height=$FZF_HEIGHT"
+  "--border=$FZF_BORDER"
+  "--margin=$FZF_MARGIN"
+  "--padding=$FZF_PADDING"
+  "--prompt=${ICON_LOADING} "
+  "--pointer=▶"
+  "--marker=✓"
+  "--info=inline"
+  "--header=Press Ctrl+P to toggle preview"
+)
+if [[ "$PREVIEW_ENABLED" == "true" ]]; then
+  FZF_ARGS+=("--preview=bash -c 'generate_preview "{}"'")
+  FZF_ARGS+=("--preview-window=$PREVIEW_POSITION:$PREVIEW_SIZE:$PREVIEW_WINDOW_OPTS")
+fi
+for binding in "${FZF_KEYBINDINGS[@]}"; do
+  FZF_ARGS+=("--bind=$binding")
+done
+
+# --- Execute ---
+
+# The core command needs to be assembled into a string to be passed to a new terminal instance.
+# First, export the preview function so the new shell can find it.
+export -f generate_preview
+export ICON_DIR ICON_FILE
+
+# Create a temporary file to store the selection from fzf
+TMP_SELECTION_FILE=$(mktemp)
+# Ensure the temp file is cleaned up on exit
+trap 'rm -f "$TMP_SELECTION_FILE"' EXIT
+
+# Assemble the fd and fzf commands with properly quoted arguments.
+fd_cmd_str="fd $(printf "%q " "${FD_ARGS[@]}") ."
+fzf_cmd_str="fzf $(printf "%q " "${FZF_ARGS[@]}")"
+
+# Create the full pipeline command. The output of fzf is redirected to the temp file.
+pipeline_cmd="(cd '$SEARCH_PATH' && $fd_cmd_str | $fzf_cmd_str) > '$TMP_SELECTION_FILE'"
+
+# Determine the terminal command and execute the pipeline within it.
+case "$TERMINAL" in
+  kitty)
+    kitty --title "zf-launcher" bash -c "$pipeline_cmd"
+    ;;
+  alacritty)
+    alacritty --title "zf-launcher" -e bash -c "$pipeline_cmd"
+    ;;
+  wezterm)
+    wezterm start --title "zf-launcher" -- bash -c "$pipeline_cmd"
+    ;;
+  foot)
+    foot --title "zf-launcher" bash -c "$pipeline_cmd"
+    ;;
+  *)
+    echo "⚠️ Warning: Unsupported terminal '$TERMINAL' in config. Trying to run in current environment." >&2
+    if [[ -t 0 ]]; then # Check if stdin is a terminal
+      # The pipeline command already redirects to the temp file
+      bash -c "$pipeline_cmd"
+    else
+      echo "❌ Error: Cannot launch fzf because this script is not running in a terminal." >&2
+      echo "   Please configure a supported terminal (kitty, alacritty, wezterm, foot) in '$CONFIG_FILE'." >&2
+      exit 1
+    fi
+    ;;
+esac
+
+# Read the selection from the temporary file
+selected=$(<"$TMP_SELECTION_FILE")
+
+# If a selection was made, open it with the configured editor
+if [ -n "$selected" ]; then
+  # Construct full path for the editor
+  full_path="$SEARCH_PATH/$selected"
+
+  # Determine which editor command to use
+  final_editor_cmd=""
+  if command -v "$EDITOR_CMD" &>/dev/null; then
+    final_editor_cmd="$EDITOR_CMD"
+  elif command -v "$EDITOR_FALLBACK" &>/dev/null; then
+    echo "Info: Main editor '$EDITOR_CMD' not found. Using fallback '$EDITOR_FALLBACK'." >&2
+    final_editor_cmd="$EDITOR_FALLBACK"
+    EDITOR_FLAGS=() # Reset flags for fallback
+  else
+    echo "❌ Error: Neither editor command '$EDITOR_CMD' nor fallback '$EDITOR_FALLBACK' were found." >&2
+    exit 1
+  fi
+  
+  # Replace %F placeholder in flags, or append path if not present.
+  declare -a final_args=()
+  path_inserted=false
+  for flag in "${EDITOR_FLAGS[@]}"; do
+    if [[ "$flag" == "%F" ]]; then
+      final_args+=("$full_path")
+      path_inserted=true
+    else
+      final_args+=("$flag")
+    fi
+  done
+  if ! $path_inserted; then
+    final_args+=("$full_path")
+  fi
+
+  # Execute the editor
+  exec "$final_editor_cmd" "${final_args[@]}"
+fi

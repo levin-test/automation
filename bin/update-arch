@@ -3,6 +3,9 @@
 import subprocess  # サブプロセスを使って外部コマンドを実行するための標準ライブラリ
 import time  # プログレス表示のために待機時間を設定するための標準ライブラリ
 import shlex  # コマンド文字列を安全に分割するための標準ライブラリ
+import os
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
 
 # ターミナルで文字色を変更するためのANSIエスケープコード
 BLUE = "\033[1;34m"  # 青色
@@ -43,30 +46,70 @@ def run_command(cmd, sec=0.5, color=BLUE):
 
 
 if __name__ == "__main__":
-    # yay, paru, pacmanの順でコマンドが存在するか確認し、システムアップデートを実行
-    if is_command_exists("yay"):
-        run_command("yay -Syu", 0)
-    elif is_command_exists("paru"):
-        run_command("paru -Syu", 0)
+    # ログファイルパス設定
+    log_dir = Path.home() / ".local" / "state" / "update-arch"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "log.txt"
+
+    # 前回実行情報の表示
+    if log_file.exists():
+        try:
+            with log_file.open("r") as f:
+                lines = f.readlines()
+                if lines:
+                    last = lines[-1].strip()
+                    print(f"[Last run] {last}")
+        except Exception as e:
+            print(f"[Log read error] {e}")
     else:
-        run_command("sudo pacman -Syu", 0.3)
+        print("[No previous log found]")
 
-    # yayが存在する場合、キャッシュクリーンの確認と実行
-    if is_command_exists("yay"):
-        confirm = input("yayのキャッシュを削除しますか？ (y/N): ")
-        if confirm.lower() == "y":
-            run_command("yay -Sc", 0)
+    # JSTタイムゾーン
+    JST = timezone(timedelta(hours=9), name="JST")
+    now = datetime.now(JST)
+    status = "success"
+    try:
+        # yay, paru, pacmanの順でコマンドが存在するか確認し、システムアップデートとキャッシュクリーンを実行
+        if is_command_exists("yay"):
+            run_command("yay -Syu", 0)
+            confirm = input("yayのキャッシュを削除しますか？ (y/N): ")
+            if confirm.lower() == "y":
+                run_command("yay -Sc", 0)
+        elif is_command_exists("paru"):
+            run_command("paru -Syu", 0)
+            confirm = input("paruのキャッシュを削除しますか？ (y/N): ")
+            if confirm.lower() == "y":
+                run_command("paru -Sc", 0)
+        else:
+            run_command("sudo pacman -Syu", 0.3)
 
-    # TODO: paruのキャッシュクリーンも追加する
+        # npmがインストールされていれば、グローバルパッケージのアップデートと脆弱性チェックを実行
+        if is_command_exists("npm"):
+            run_command("sudo npm update -g", 0.3)
+            run_command("npx --yes npm-global-audit", 0.1)
 
-    # flatpakがインストールされていれば、flatpakのアップデートと未使用パッケージの削除を実行
-    if is_command_exists("flatpak"):
-        run_command("flatpak update", 0.3)
-        run_command("flatpak uninstall --unused", 0.1)
+        # clamavがインストールされていれば、ウィルス定義ファイルを更新
+        if is_command_exists("freshclam"):
+            run_command("sudo freshclam", 0.3)
 
-    # nvimがインストールされていれば、Neovimプラグインの同期を実行
-    if is_command_exists("nvim"):
-        run_command("nvim --headless '+Lazy! sync' +qa", 0.3)
+        # flatpakがインストールされていれば、flatpakのアップデートと未使用パッケージの削除を実行
+        if is_command_exists("flatpak"):
+            run_command("flatpak update", 0.3)
+            run_command("flatpak uninstall --unused", 0.1)
 
-    # すべてのアップデートが完了したことを表示
-    print("\n" + f"{BLUE}:: すべてのアップデートが完了しました{NC}")
+        # nvimがインストールされていれば、Neovimプラグインの同期を実行
+        if is_command_exists("nvim"):
+            run_command("nvim --headless '+Lazy! sync' +qa", 0.3)
+
+        print("\n" + f"{BLUE}:: すべてのアップデートが完了しました{NC}")
+    except Exception as e:
+        status = f"fail ({e})"
+        print(f"[Error] {e}")
+    finally:
+        # ログ追記
+        log_line = f"{now.strftime('%Y-%m-%d %H:%M:%S')} JST | status: {status}\n"
+        try:
+            with log_file.open("a") as f:
+                f.write(log_line)
+        except Exception as e:
+            print(f"[Log write error] {e}")
