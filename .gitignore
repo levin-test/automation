@@ -1,2 +1,16 @@
-venv
-vibe_prompt_draft.md
+# Backup files
+*.backup.*
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Language-specific ignores are in respective subdirectories
+# (e.g., go/zf-launcher/.gitignore)

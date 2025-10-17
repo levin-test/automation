@@ -1,55 +1,69 @@
 # automation
 
-## 概要
+個人用自動化スクリプト・ツール集
 
-このリポジトリは、個人の環境で利用するスクリプトや設定ファイルを管理します。
+## ディレクトリ構成
 
-## セットアップと運用
+```
+automation/
+├── shell/          # シェルスクリプト（stow管理対象）
+│   ├── .config/    # 設定ファイル
+│   └── .local/bin/ # 実行可能スクリプト
+├── go/             # Goプロジェクト
+│   └── zf-launcher/
+├── python/         # Pythonプロジェクト（将来用）
+└── doc/            # ドキュメント
+```
 
-このリポジトリのスクリプトを `~/.local/bin` に配置してパスを通すには、[GNU Stow](https://www.gnu.org/software/stow/) を利用します。
+## セットアップ
 
-### 1. インストール
-
-`stow`がシステムにインストールされていることを確認してください。
-
-リポジトリのルートディレクトリで以下のコマンドを実行すると、`bin`ディレクトリ内の各スクリプトへのシンボリックリンクが `~/.local/bin` ディレクトリ内に作成されます。
+### シェルスクリプトのインストール（stow使用）
 
 ```bash
-stow -t ~/.local/bin bin
+cd ~/automation
+stow -d ~/automation -t ~ shell
 ```
 
-### 2. 設定ファイルの配置
+これにより以下が symlink されます：
+- `~/automation/shell/.local/bin/*` → `~/.local/bin/*`
+- `~/automation/shell/.config/*` → `~/.config/`
 
-設定ファイルを `~/.config` に配置するには、リポジトリのルートディレクトリで以下のコマンドを実行します。
+### Go プロジェクトのビルド
 
 ```bash
-stow -t ~ .config
+cd ~/automation/go/zf-launcher
+make install
 ```
 
-このコマンドで、`.config` ディレクトリ内のファイルが `~/.config` ディレクトリ内にシンボリックリンクとして配置されます。
+## 各ツールの説明
 
-例）`zf-launcher` の設定ファイル：
+### シェルスクリプト
 
-```text
-# リポジトリ内のパス
-.config/zf-launcher/config.yaml
+- **zf-launcher2**: ファイル検索・選択ランチャー（Bash版）
+- **backup-7z**: 7z形式でのバックアップツール
+- **chat-archiver**: チャット履歴アーカイブツール
+- その他セットアップ・メンテナンススクリプト
 
-# ホームディレクトリ内のリンク先
-~/.config/zf-launcher/config.yaml
-```
+### Goツール
 
-### 3. アンインストール
+- **zf-launcher**: zf-launcher2 のGo実装版
 
-シンボリックリンクを解除するには、`-D` (delete) オプションを利用します。
-
-スクリプト：
+## stow の基本コマンド
 
 ```bash
-stow -D -t ~/.local/bin bin
+# symlink 作成
+stow -d ~/automation -t ~ shell
+
+# symlink 削除
+stow -D -d ~/automation -t ~ shell
+
+# 既存 symlink を更新（再作成）
+stow -R -d ~/automation -t ~ shell
+
+# dry-run（実際には実行しない）
+stow -n -v -d ~/automation -t ~ shell
 ```
 
-設定ファイル：
+## ライセンス
 
-```bash
-stow -D -t ~ .config
-```
+See LICENSE file.
