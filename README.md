@@ -14,15 +14,19 @@ automation/
 │   ├── .config/        # 設定ファイル → ~/.config にsymlink
 │   │   └── zf-launcher/
 │   │       └── config.yaml
-│   └── .local/bin/     # 実行可能スクリプト → ~/.local/bin にsymlink
-│       ├── backup-7z
+│   └── .local/bin/     # シェルスクリプト → ~/.local/bin にsymlink
 │       ├── chat-archiver
 │       ├── setup-arch
 │       ├── setup-cachyos-hyprland
 │       ├── toilet
-│       ├── update-arch
 │       ├── venv-setup
 │       └── zf-launcher2
+├── python/             # Pythonスクリプト（stow管理対象）
+│   ├── .config/        # 設定ファイル → ~/.config にsymlink
+│   │   └── .gitkeep
+│   └── .local/bin/     # Pythonスクリプト → ~/.local/bin にsymlink
+│       ├── backup-7z
+│       └── update-arch
 ├── go/                 # Goプロジェクト
 │   └── zf-launcher/    # zf-launcher2 のGo実装
 │       ├── cmd/
@@ -31,8 +35,6 @@ automation/
 │       ├── Makefile
 │       ├── go.mod      (未作成)
 │       └── README.md
-├── python/             # Pythonプロジェクト（将来用）
-│   └── .gitkeep
 ├── doc/                # ドキュメント
 │   ├── how_to_setup_hyprland.md
 │   └── README_ChatArchiver.md
@@ -52,21 +54,24 @@ git clone https://github.com/levin-test/automation.git ~/automation
 cd ~/automation
 ```
 
-#### 2. シェルスクリプトのインストール（stow使用）
+#### 2. シェルスクリプトとPythonスクリプトのインストール（stow使用）
 
 ```bash
-stow -d ~/automation -t ~ shell
+stow -d ~/automation -t ~ shell python
 ```
 
 **実行結果:**
 
 - `~/automation/shell/.local/bin/*` が `~/.local/bin/*` にシンボリックリンク化
+- `~/automation/python/.local/bin/*` が `~/.local/bin/*` にシンボリックリンク化
 - `~/automation/shell/.config/*` が `~/.config/` にシンボリックリンク化
+- `~/automation/python/.config/*` が `~/.config/` にシンボリックリンク化
 
 確認：
 
 ```bash
-ls -la ~/.local/bin/zf-launcher2    # シンボリックリンク確認
+ls -la ~/.local/bin/zf-launcher2    # Bashスクリプトのシンボリックリンク確認
+ls -la ~/.local/bin/backup-7z       # Pythonスクリプトのシンボリックリンク確認
 cat ~/.config/zf-launcher/config.yaml  # 設定ファイル確認
 ```
 
@@ -87,7 +92,7 @@ cd ~/automation
 git pull
 
 # 新しいスクリプトを反映（必要に応じて）
-stow -R -d ~/automation -t ~ shell
+stow -R -d ~/automation -t ~ shell python
 ```
 
 ## 各ツールの説明
@@ -97,13 +102,18 @@ stow -R -d ~/automation -t ~ shell
 | スクリプト | 説明 |
 |-----------|------|
 | **zf-launcher2** | fzfを使用したインタラクティブなファイル検索・選択ランチャー（Bash版） |
-| **backup-7z** | 7z形式でのバックアップツール |
 | **chat-archiver** | チャット履歴アーカイブツール |
 | **setup-arch** | Arch Linuxの初期セットアップスクリプト |
 | **setup-cachyos-hyprland** | CachyOS + Hyprland の初期セットアップスクリプト |
-| **update-arch** | Arch Linuxのアップデート・メンテナンススクリプト |
-| **venv-setup** | Python仮想環境のセットアップ補助スクリプト |
 | **toilet** | テキストをASCIIアートに変換するスクリプト |
+| **venv-setup** | Python仮想環境のセットアップ補助スクリプト |
+
+### Pythonスクリプト（python/.local/bin/）
+
+| スクリプト | 説明 |
+|-----------|------|
+| **backup-7z** | 7z形式でのバックアップツール |
+| **update-arch** | Arch Linuxのアップデート・メンテナンススクリプト |
 
 ### 設定ファイル（shell/.config/）
 
@@ -126,20 +136,20 @@ stow -R -d ~/automation -t ~ shell
 ### 基本コマンド
 
 ```bash
-# シンボリックリンク作成
-stow -d ~/automation -t ~ shell
+# シンボリックリンク作成（shell と python の両方）
+stow -d ~/automation -t ~ shell python
 
-# シンボリックリンク削除
-stow -D -d ~/automation -t ~ shell
+# シンボリックリンク削除（shell と python の両方）
+stow -D -d ~/automation -t ~ shell python
 
 # 既存リンクを更新（削除してから再作成）
-stow -R -d ~/automation -t ~ shell
+stow -R -d ~/automation -t ~ shell python
 
 # 実行前にプレビュー（ドライラン）
-stow -n -v -d ~/automation -t ~ shell
+stow -n -v -d ~/automation -t ~ shell python
 
 # より詳細な情報を表示
-stow -v -d ~/automation -t ~ shell
+stow -v -d ~/automation -t ~ shell python
 ```
 
 ### オプション説明
@@ -199,18 +209,37 @@ stow -R -d ~/automation -t ~ shell
 
 ### 新しいスクリプトを追加する場合
 
+#### シェルスクリプト
+
 1. スクリプトを `shell/.local/bin/` に配置
 2. 実行権限を付与: `chmod +x shell/.local/bin/your_script`
 3. Gitで管理: `git add shell/.local/bin/your_script`
 4. コミット: `git commit -m "feat: Add your_script"`
-5. stowで反映: `stow -R -d ~/automation -t ~ shell`
+5. stowで反映: `stow -R -d ~/automation -t ~ shell python`
+
+#### Pythonスクリプト
+
+1. スクリプトを `python/.local/bin/` に配置（shebang: `#!/usr/bin/env python3`）
+2. 実行権限を付与: `chmod +x python/.local/bin/your_script`
+3. Gitで管理: `git add python/.local/bin/your_script`
+4. コミット: `git commit -m "feat: Add your_script"`
+5. stowで反映: `stow -R -d ~/automation -t ~ shell python`
 
 ### 設定ファイルを追加する場合
+
+#### Shell用設定ファイル
 
 1. ファイルを `shell/.config/your_app/` に配置
 2. Gitで管理: `git add shell/.config/your_app/`
 3. コミット: `git commit -m "feat: Add config for your_app"`
-4. stowで反映: `stow -R -d ~/automation -t ~ shell`
+4. stowで反映: `stow -R -d ~/automation -t ~ shell python`
+
+#### Python用設定ファイル
+
+1. ファイルを `python/.config/your_app/` に配置
+2. Gitで管理: `git add python/.config/your_app/`
+3. コミット: `git commit -m "feat: Add config for your_app"`
+4. stowで反映: `stow -R -d ~/automation -t ~ shell python`
 
 ### Go プロジェクトを開発する場合
 
