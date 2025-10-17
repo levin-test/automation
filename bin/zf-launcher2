@@ -40,7 +40,6 @@ CONFIG_FILE="$HOME/.config/zf-launcher/config.yaml"
 if [[ ! -f "$CONFIG_FILE" ]]; then
   echo "🔍 Configuration file not found. Creating a default one at $CONFIG_FILE"
   mkdir -p "$(dirname "$CONFIG_FILE")"
-  # Using the config from the user's context
   cat >"$CONFIG_FILE" <<'EOF'
 # ~/.config/zf-launcher/config.yaml
 terminal:
@@ -80,10 +79,23 @@ fzf:
     select_all: "ctrl-a"
     deselect_all: "ctrl-d"
 
+# Multi-editor configuration
 editor:
-  command: zeditor
-  flags:
-    - --new
+  primary:
+    command: code
+    flags:
+      - "--new-window"
+      - "%F"
+    label: "VS Code"
+  
+  secondary:
+    command: zeditor
+    flags:
+      - "--new"
+      - "%F"
+    label: "Zed"
+  
+  # Fallback editor
   fallback: nvim
 
 ui:
@@ -95,6 +107,7 @@ ui:
     success: "✅"
     error: "❌"
     loading: "🔍"
+    editor: "✎"
 
 logging:
   enabled: true
@@ -129,17 +142,37 @@ FZF_HEIGHT=$(yq_get '.fzf.layout.height')
 FZF_BORDER=$(yq_get '.fzf.layout.border')
 FZF_MARGIN=$(yq_get '.fzf.layout.margin')
 FZF_PADDING=$(yq_get '.fzf.layout.padding')
-mapfile -t FZF_KEYBINDINGS < <(yq e '[.fzf.keybindings | to_entries[] | .value + ":" + .key] | .[]' "$CONFIG_FILE")
+mapfile -t FZF_KEYBINDINGS < <(yq e '[.fzf.keybindings | to_entries[] | .key + ":" + .value] | .[]' "$CONFIG_FILE")
 
-# Editor parameters
-EDITOR_CMD=$(yq_get '.editor.command')
+# Editor parameters - Multi-editor support
+declare -A EDITORS_CMD
+declare -A EDITORS_FLAGS
+declare -A EDITORS_LABEL
+declare -a EDITOR_KEYS
+
+# Read all available editors (primary, secondary, tertiary)
+for key in $(yq_get '.editor | keys[]'); do
+  if [[ "$key" != "fallback" ]]; then
+    cmd=$(yq_get ".editor.$key.command")
+    label=$(yq_get ".editor.$key.label" 2>/dev/null || echo "$key")
+    
+    EDITORS_CMD["$key"]="$cmd"
+    EDITORS_LABEL["$key"]="$label"
+    EDITOR_KEYS+=("$key")
+    
+    # Read flags for this editor
+    mapfile -t flags_array < <(yq_get ".editor.$key.flags[]")
+    EDITORS_FLAGS["$key"]=$(printf '%q ' "${flags_array[@]}")
+  fi
+done
+
 EDITOR_FALLBACK=$(yq_get '.editor.fallback')
-mapfile -t EDITOR_FLAGS < <(yq_get '.editor.flags[]')
 
 # UI Icons
 ICON_DIR=$(yq_get '.ui.icons.directory')
 ICON_FILE=$(yq_get '.ui.icons.file')
 ICON_LOADING=$(yq_get '.ui.icons.loading')
+ICON_EDITOR=$(yq_get '.ui.icons.editor' 2>/dev/null || echo "✎")
 
 # --- Build Commands Dynamically ---
 
@@ -215,87 +248,123 @@ FZF_ARGS+=(
   "--pointer=▶"
   "--marker=✓"
   "--info=inline"
-  "--header=Press Ctrl+P to toggle preview"
+  "--header=Press Ctrl+P to toggle preview | Ctrl+A to select all | Ctrl+D to deselect all"
 )
 if [[ "$PREVIEW_ENABLED" == "true" ]]; then
   FZF_ARGS+=("--preview=bash -c 'generate_preview "{}"'")
   FZF_ARGS+=("--preview-window=$PREVIEW_POSITION:$PREVIEW_SIZE:$PREVIEW_WINDOW_OPTS")
 fi
-for binding in "${FZF_KEYBINDINGS[@]}"; do
-  FZF_ARGS+=("--bind=$binding")
-done
+# Add keybindings with proper fzf syntax
+FZF_ARGS+=(
+  "--bind=ctrl-p:toggle-preview"
+  "--bind=ctrl-a:select-all"
+  "--bind=ctrl-d:deselect-all"
+)
 
 # --- Execute ---
 
-# The core command needs to be assembled into a string to be passed to a new terminal instance.
-# First, export the preview function so the new shell can find it.
+# Export functions and variables for use in the terminal subprocess
 export -f generate_preview
-export ICON_DIR ICON_FILE
+export ICON_DIR ICON_FILE ICON_EDITOR
 
-# Create a temporary file to store the selection from fzf
-TMP_SELECTION_FILE=$(mktemp)
-# Ensure the temp file is cleaned up on exit
-trap 'rm -f "$TMP_SELECTION_FILE"' EXIT
+# Export editor configuration for use in the terminal subprocess
+export CONFIG_FILE
+for key in "${EDITOR_KEYS[@]}"; do
+  export "EDITOR_${key}_CMD=${EDITORS_CMD[$key]}"
+  export "EDITOR_${key}_FLAGS=${EDITORS_FLAGS[$key]}"
+  export "EDITOR_${key}_LABEL=${EDITORS_LABEL[$key]}"
+done
+export EDITOR_FALLBACK
+export SEARCH_PATH
 
-# Assemble the fd and fzf commands with properly quoted arguments.
-fd_cmd_str="fd $(printf "%q " "${FD_ARGS[@]}") ."
-fzf_cmd_str="fzf $(printf "%q " "${FZF_ARGS[@]}")"
+# Create the script that will run inside the terminal
+TERMINAL_SCRIPT=$(cat <<'SCRIPT_END'
+# File selection with fzf
+FD_ARGS_STR="__FD_ARGS__"
+FZF_ARGS_STR="__FZF_ARGS__"
 
-# Create the full pipeline command. The output of fzf is redirected to the temp file.
-pipeline_cmd="(cd '$SEARCH_PATH' && $fd_cmd_str | $fzf_cmd_str) > '$TMP_SELECTION_FILE'"
+selected=$(cd "$SEARCH_PATH" && eval "fd $FD_ARGS_STR ." | eval "fzf $FZF_ARGS_STR")
 
-# Determine the terminal command and execute the pipeline within it.
-case "$TERMINAL" in
-  kitty)
-    kitty --title "zf-launcher" bash -c "$pipeline_cmd"
-    ;;
-  alacritty)
-    alacritty --title "zf-launcher" -e bash -c "$pipeline_cmd"
-    ;;
-  wezterm)
-    wezterm start --title "zf-launcher" -- bash -c "$pipeline_cmd"
-    ;;
-  foot)
-    foot --title "zf-launcher" bash -c "$pipeline_cmd"
-    ;;
-  *)
-    echo "⚠️ Warning: Unsupported terminal '$TERMINAL' in config. Trying to run in current environment." >&2
-    if [[ -t 0 ]]; then # Check if stdin is a terminal
-      # The pipeline command already redirects to the temp file
-      bash -c "$pipeline_cmd"
-    else
-      echo "❌ Error: Cannot launch fzf because this script is not running in a terminal." >&2
-      echo "   Please configure a supported terminal (kitty, alacritty, wezterm, foot) in '$CONFIG_FILE'." >&2
-      exit 1
-    fi
-    ;;
-esac
+if [ -z "$selected" ]; then
+  echo "No file selected" >&2
+  exit 0
+fi
 
-# Read the selection from the temporary file
-selected=$(<"$TMP_SELECTION_FILE")
+full_path="$SEARCH_PATH/$selected"
 
-# If a selection was made, open it with the configured editor
-if [ -n "$selected" ]; then
-  # Construct full path for the editor
-  full_path="$SEARCH_PATH/$selected"
+# Find available editors
+EDITOR_KEYS_STR="__EDITOR_KEYS__"
+IFS=' ' read -ra EDITOR_KEYS <<< "$EDITOR_KEYS_STR"
 
-  # Determine which editor command to use
-  final_editor_cmd=""
-  if command -v "$EDITOR_CMD" &>/dev/null; then
-    final_editor_cmd="$EDITOR_CMD"
-  elif command -v "$EDITOR_FALLBACK" &>/dev/null; then
-    echo "Info: Main editor '$EDITOR_CMD' not found. Using fallback '$EDITOR_FALLBACK'." >&2
-    final_editor_cmd="$EDITOR_FALLBACK"
-    EDITOR_FLAGS=() # Reset flags for fallback
+available_editors=()
+for key in "${EDITOR_KEYS[@]}"; do
+  cmd_var="EDITOR_${key}_CMD"
+  cmd="${!cmd_var}"
+  if command -v "$cmd" &>/dev/null; then
+    available_editors+=("$key")
+  fi
+done
+
+# Select editor
+if [ ${#available_editors[@]} -eq 0 ]; then
+  if command -v "$EDITOR_FALLBACK" &>/dev/null; then
+    selected_editor="fallback"
   else
-    echo "❌ Error: Neither editor command '$EDITOR_CMD' nor fallback '$EDITOR_FALLBACK' were found." >&2
+    echo "❌ Error: No editors available" >&2
+    read -p "Press Enter to close..."
     exit 1
   fi
+elif [ ${#available_editors[@]} -eq 1 ]; then
+  selected_editor="${available_editors[0]}"
+else
+  # Multiple editors - show selection menu
+  editor_menu=""
+  for key in "${available_editors[@]}"; do
+    label_var="EDITOR_${key}_LABEL"
+    label="${!label_var}"
+    editor_menu="${editor_menu}${key}:${label}"$'\n'
+  done
   
-  # Replace %F placeholder in flags, or append path if not present.
-  declare -a final_args=()
+  selected_line=$(echo -n "$editor_menu" | fzf \
+    --height=20% \
+    --border=rounded \
+    --prompt="${ICON_EDITOR} Select Editor: " \
+    --pointer="▶" \
+    --marker="✓" \
+    --no-multi \
+    --with-nth=2 \
+    --delimiter=: \
+    --exit-0)
+  
+  if [ -z "$selected_line" ]; then
+    echo "No editor selected" >&2
+    exit 0
+  fi
+  
+  selected_editor=$(echo "$selected_line" | cut -d: -f1)
+fi
+
+# Launch editor
+if [ "$selected_editor" = "fallback" ]; then
+  echo "🚀 Opening with: $EDITOR_FALLBACK" >&2
+  "$EDITOR_FALLBACK" "$full_path" &
+else
+  label_var="EDITOR_${selected_editor}_LABEL"
+  cmd_var="EDITOR_${selected_editor}_CMD"
+  flags_var="EDITOR_${selected_editor}_FLAGS"
+  
+  label="${!label_var}"
+  cmd="${!cmd_var}"
+  flags_str="${!flags_var}"
+  
+  echo "🚀 Opening with: $label" >&2
+  
+  # Parse flags
+  eval "flags_array=($flags_str)"
+  final_args=()
   path_inserted=false
-  for flag in "${EDITOR_FLAGS[@]}"; do
+  
+  for flag in "${flags_array[@]}"; do
     if [[ "$flag" == "%F" ]]; then
       final_args+=("$full_path")
       path_inserted=true
@@ -303,10 +372,51 @@ if [ -n "$selected" ]; then
       final_args+=("$flag")
     fi
   done
+  
   if ! $path_inserted; then
     final_args+=("$full_path")
   fi
-
-  # Execute the editor
-  exec "$final_editor_cmd" "${final_args[@]}"
+  
+  "$cmd" "${final_args[@]}" &
 fi
+
+# Wait for editor to start, then close terminal
+sleep 0.5
+echo "✅ Editor launched successfully" >&2
+SCRIPT_END
+)
+
+# Replace placeholders in the script
+FD_ARGS_QUOTED=$(printf "%q " "${FD_ARGS[@]}")
+FZF_ARGS_QUOTED=$(printf "%q " "${FZF_ARGS[@]}")
+EDITOR_KEYS_STR="${EDITOR_KEYS[*]}"
+
+TERMINAL_SCRIPT="${TERMINAL_SCRIPT//__FD_ARGS__/$FD_ARGS_QUOTED}"
+TERMINAL_SCRIPT="${TERMINAL_SCRIPT//__FZF_ARGS__/$FZF_ARGS_QUOTED}"
+TERMINAL_SCRIPT="${TERMINAL_SCRIPT//__EDITOR_KEYS__/$EDITOR_KEYS_STR}"
+
+# Execute in terminal
+case "$TERMINAL" in
+  kitty)
+    kitty --title "zf-launcher" bash -c "$TERMINAL_SCRIPT"
+    ;;
+  alacritty)
+    alacritty --title "zf-launcher" -e bash -c "$TERMINAL_SCRIPT"
+    ;;
+  wezterm)
+    wezterm start --title "zf-launcher" -- bash -c "$TERMINAL_SCRIPT"
+    ;;
+  foot)
+    foot --title "zf-launcher" bash -c "$TERMINAL_SCRIPT"
+    ;;
+  *)
+    echo "⚠️ Warning: Unsupported terminal '$TERMINAL' in config. Trying to run in current environment." >&2
+    if [[ -t 0 ]]; then
+      bash -c "$TERMINAL_SCRIPT"
+    else
+      echo "❌ Error: Cannot launch fzf because this script is not running in a terminal." >&2
+      echo "   Please configure a supported terminal (kitty, alacritty, wezterm, foot) in '$CONFIG_FILE'." >&2
+      exit 1
+    fi
+    ;;
+esac

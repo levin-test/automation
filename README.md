@@ -18,10 +18,38 @@
 stow -t ~/.local/bin bin
 ```
 
-### 2. アンインストール
+### 2. 設定ファイルの配置
 
-シンボリックリンクを解除するには、`-D` (delete) オプションを利用して以下のコマンドを実行します。
+設定ファイルを `~/.config` に配置するには、リポジトリのルートディレクトリで以下のコマンドを実行します。
+
+```bash
+stow -t ~ .config
+```
+
+このコマンドで、`.config` ディレクトリ内のファイルが `~/.config` ディレクトリ内にシンボリックリンクとして配置されます。
+
+例）`zf-launcher` の設定ファイル：
+
+```text
+# リポジトリ内のパス
+.config/zf-launcher/config.yaml
+
+# ホームディレクトリ内のリンク先
+~/.config/zf-launcher/config.yaml
+```
+
+### 3. アンインストール
+
+シンボリックリンクを解除するには、`-D` (delete) オプションを利用します。
+
+スクリプト：
 
 ```bash
 stow -D -t ~/.local/bin bin
+```
+
+設定ファイル：
+
+```bash
+stow -D -t ~ .config
 ```

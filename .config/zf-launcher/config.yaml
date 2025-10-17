@@ -1,0 +1,81 @@
+# ~/.config/zf-launcher/config.yaml
+terminal:
+  name: kitty
+  # 利用可能: kitty, alacritty, wezterm, foot
+
+search:
+  base_path: ~
+  exclude:
+    - .cache
+    - node_modules
+    - .git
+    - target
+    - build
+    - dist
+    - .next
+    - __pycache__
+    - .venv
+  include_hidden: true
+  file_types:
+    - f # files
+    - d # directories
+
+fzf:
+  preview:
+    enabled: true
+    position: right
+    size: 50%
+    window_options: "border-rounded"
+  layout:
+    height: 80%
+    border: rounded
+    margin: 1
+    padding: 1
+  keybindings:
+    toggle_preview: "ctrl-p"
+    select_all: "ctrl-a"
+    deselect_all: "ctrl-d"
+
+# マルチエディタ設定
+# 設定されたエディタのみがメニューに表示されます
+# `primary`は必須です（存在しない場合はフォールバック）
+editor:
+  primary:
+    command: code
+    flags:
+      - "--new-window"
+      - "%F"
+    label: "Visual Studio Code"
+  
+  secondary:
+    command: zeditor
+    flags:
+      - "--new"
+      - "%F"
+    label: "Zeditor"
+  
+  # tertiary は optional
+  # tertiary:
+  #   command: nvim
+  #   flags:
+  #     - "+%F"
+  #   label: "Neovim"
+  
+  # フォールバック（どのエディタも見つからない場合）
+  fallback: nvim
+
+ui:
+  show_progress: true
+  show_terminal_info: true
+  icons:
+    directory: "📁"
+    file: "📄"
+    success: "✅"
+    error: "❌"
+    loading: "🔍"
+    editor: "✎"
+
+logging:
+  enabled: true
+  level: info
+  file: /tmp/zf-launcher.log
